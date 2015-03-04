@@ -10,8 +10,10 @@ ENV DOCKER_GEN 0.3.6
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install Nginx.
-RUN apt-get update &&  apt-get install nano git build-essential cmake zlib1g-dev libpcre3 libpcre3-dev unzip wget curl -y && \
-    apt-get dist-upgrade -y
+RUN apt-get update &&  apt-get install nano git build-essential cmake zlib1g-dev libpcre3 libpcre3-dev unzip curl -y && \
+    apt-get dist-upgrade -y &&\
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* 
 
 EXPOSE 80 443
 
@@ -21,9 +23,8 @@ RUN mkdir -p ${MODULESDIR} && \
     curl http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz | tar zvx && \
     curl http://www.openssl.org/source/${OPENSSL_VERSION}.tar.gz | tar zvx && \
     cd ${MODULESDIR} && \
-    git clone git://github.com/bpaquet/ngx_http_enhanced_memcached_module.git && \
     git clone https://github.com/openresty/headers-more-nginx-module.git && \
-    wget --no-check-certificate https://github.com/pagespeed/ngx_pagespeed/archive/release-${NPS_VERSION}-beta.zip && \
+    curl -L -O https://github.com/pagespeed/ngx_pagespeed/archive/release-${NPS_VERSION}-beta.zip && \
     unzip release-${NPS_VERSION}-beta.zip && \
     cd ngx_pagespeed-release-${NPS_VERSION}-beta/ && \
     curl -L -k https://dl.google.com/dl/page-speed/psol/${NPS_VERSION}.tar.gz | tar zxv
@@ -32,7 +33,7 @@ RUN mkdir -p ${MODULESDIR} && \
 RUN cd /usr/src/nginx-${NGINX_VERSION} && ./configure \
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
-        --conf-path=/etc/nginx/nginx.conf \
+        --conf-path=/data/conf/nginx.conf \
         --error-log-path=/data/logs/error.log \
         --http-log-path=/data/logs/access.log \
         --pid-path=/var/run/nginx.pid \
@@ -60,14 +61,13 @@ RUN cd /usr/src/nginx-${NGINX_VERSION} && ./configure \
         --with-md5='../${OPENSSL_VERSION}' \
         --with-openssl='../${OPENSSL_VERSION}' \
         --add-module=${MODULESDIR}/ngx_pagespeed-release-${NPS_VERSION}-beta \
-        --add-module=${MODULESDIR}/ngx_http_enhanced_memcached_module \
         --add-module=${MODULESDIR}/headers-more-nginx-module && \
     cd /usr/src/nginx-${NGINX_VERSION} && make && make install
 
 #Add custom nginx.conf file
-ADD nginx.conf /etc/nginx/nginx.conf
-ADD pagespeed.conf /etc/nginx/pagespeed.conf
-ADD proxy_params /etc/nginx/proxy_params
+ADD nginx.conf /data/conf/nginx.conf
+ADD pagespeed.conf /data/conf/pagespeed.conf
+ADD proxy_params /data/conf/proxy_params
 
 RUN mkdir /app
 WORKDIR /app
@@ -75,7 +75,7 @@ ADD ./app /app
 
 RUN chmod u+x /app/init.sh
 
-RUN wget -P /usr/local/bin https://godist.herokuapp.com/projects/ddollar/forego/releases/current/linux-amd64/forego && \
+RUN cd /usr/local/bin && curl -O https://godist.herokuapp.com/projects/ddollar/forego/releases/current/linux-amd64/forego && \
     chmod u+x /usr/local/bin/forego && \
     curl -L -k https://github.com/jwilder/docker-gen/releases/download/${DOCKER_GEN}/docker-gen-linux-amd64-${DOCKER_GEN}.tar.gz | tar zxv
 
